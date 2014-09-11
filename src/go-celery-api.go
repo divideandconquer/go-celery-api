@@ -16,7 +16,6 @@ import (
 	"flag"
 )
 
-
 func main() {
 	//set flags
 	configFile := flag.String("config", "", "An optional filepath for a config file.")
@@ -67,13 +66,13 @@ type TaskConfig struct {
 }
 
 type MainConfig struct {
-	Cafile string
-	Keyfile string
+	Cafile   string
+	Keyfile  string
 	Certfile string
 	Username string
 	Password string
-	Host string
-	Port string
+	Host     string
+	Port     string
 }
 
 // Retrieves the configuration from the config json
