@@ -26,8 +26,8 @@ vagrant up
 This repository requires the use of a rabbitmq / celery cluster.  To set one up follow the
 directions for the [rabbitmq-cluster](https://github.com/turbine-web/rabbitmq-cluster) project.
 
-Once you have the SSL keys generated make sure to copy the `testca/cacert.pem` and the the client `key.pem`
-and client `cert.pem` files into this repo.
+Once you have the SSL keys generated make sure to copy the `testca/cacert.pem` and the client `key.pem`
+and `cert.pem` files into this repo.
 
 E.G.
 
@@ -85,12 +85,17 @@ bin/go-celery-api  -config=./config/config.json
 
 ```
 Note that in order for the default configuration to work you must add an entry for proxy to your `go` vagrant machine's
-`/etc/hosts` file. E.G.
+`/etc/hosts` file.
 
-`sudo echo "10.20.1.6 proxy" >> /etc/hosts`
+E.G.
+
+```sh
+# Note that the vagrant auto network plugin may have chosen a different ip for your proxy server.
+sudo echo "10.20.1.6 proxy" >> /etc/hosts
+```
 
 ## Posting to the API
-To POST a task to the make a POST to http://go:8080/tasks with a JSON body:
+To POST a task to the API make a POST to http://go:8080/tasks with a JSON body:
 
 ```
 {
@@ -104,6 +109,14 @@ Using curl the command would look like this:
 
 ```sh
 curl -H "Content-Type: application/json" --data '{"Name": "tasks.add", "Args": ["4", "8"]}' http://go:8080/tasks
+```
+
+The if the task was successfully added to the celery queue you will get the following response:
+
+```
+{
+  "Status": "success"
+}
 ```
 
 # License
