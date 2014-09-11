@@ -1,0 +1,9 @@
+{
+  "Cafile" : "/vagrant/ssl/cacert.pem",
+  "Keyfile" : "/vagrant/ssl/key.pem",
+  "Certfile" : "/vagrant/ssl/cert.pem",
+  "Username" : "admin",
+  "Password" : "admin",
+  "Host" : "proxy",
+  "Port" : "5671"
+}
