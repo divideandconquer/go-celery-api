@@ -81,7 +81,7 @@ gom run src/go-celery-api.go -config=./config/config.json
 ## Posting to the API
 To POST a task to the make a POST to http://go:8080/tasks with a JSON body:
 
-```json
+```
 {
   "Name": "tasks.add", // the name of the celery task
   "Args": ["4", "8"]  // an array of arguments to pass to the celery task
