@@ -77,6 +77,10 @@ gom run src/go-celery-api.go
 gom run src/go-celery-api.go -config=./config/config.json
 
 ```
+Note that in order for the default configuration to work you must add an entry for proxy to your `go` vagrant machine's
+`/etc/hosts` file. E.G.
+
+`sudo echo "10.20.1.6 proxy" >> /etc/hosts`
 
 ## Posting to the API
 To POST a task to the make a POST to http://go:8080/tasks with a JSON body:
@@ -87,4 +91,17 @@ To POST a task to the make a POST to http://go:8080/tasks with a JSON body:
   "Args": ["4", "8"]  // an array of arguments to pass to the celery task
   //"Kwargs": {...} //Key value store of kwargs to pass to the celery task
 }
+```
+
+Using curl the command would look like this:
+
+```sh
+curl -H "Content-Type: application/json" --data '{"Name": "tasks.add", "Args": ["4", "8"]}' http://go:8080/tasks
+```
+
+# License
+This module is licensed using the Apache-2.0 License:
+
+```
+Copyright (c) 2014, Kyle Boorky
 ```
