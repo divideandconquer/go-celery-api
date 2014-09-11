@@ -70,11 +70,18 @@ run the following commands to start the server:
 vagrant ssh go
 
 cd /vagrant
+
+# run from binary
+bin/go-celery-api
+
+# run from src code
 gom install
 gom run src/go-celery-api.go
 
 # you can also pass a configuration file to the go-celery-api:
 gom run src/go-celery-api.go -config=./config/config.json
+# or from the binary:
+bin/go-celery-api  -config=./config/config.json
 
 ```
 Note that in order for the default configuration to work you must add an entry for proxy to your `go` vagrant machine's
