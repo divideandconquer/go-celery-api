@@ -1,0 +1,5 @@
+cookbooks/
+.idea/
+.vagrant/
+_vendor/
+ssl/

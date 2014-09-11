@@ -1,0 +1,10 @@
+DEPENDENCIES
+  go-sandbox
+    path: .
+    metadata: true
+  golang
+
+GRAPH
+  go-sandbox (1.0.0)
+    golang (>= 0.0.0)
+  golang (1.4.0)
