@@ -6,7 +6,6 @@ import (
 	"github.com/streadway/amqp"
 	"log"
 	"net/http"
-	"fmt"
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
@@ -14,8 +13,11 @@ import (
 	"os"
 	"encoding/json"
 	"flag"
+	"fmt"
 )
 
+// -- Main function --
+// Sets up server and Tasks struct, starts listening on 8080
 func main() {
 	//set flags
 	configFile := flag.String("config", "", "An optional filepath for a config file.")
@@ -24,21 +26,19 @@ func main() {
 	if *configFile != "" {
 		log.Printf("configFile: " + *configFile)
 	}
-	//load config
-	config := getConfig(*configFile)
 
 	//setup tasks
-	ch := getAmqpChannel(config)
-	tasks := Tasks{
-		Channel: ch,
-	}
+	tasks := new(Tasks)
+	tasks.ConfigFile = *configFile
+	//load config
+	tasks.SetupAmqpConnection()
 
 	//setup resource handler and routes
 	handler := rest.ResourceHandler{
 		EnableRelaxedContentType: true,
 	}
 	err := handler.SetRoutes(
-	rest.RouteObjectMethod("POST", "/tasks", &tasks, "PostTask"),
+	rest.RouteObjectMethod("POST", "/tasks", tasks, "PostTask"),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -46,6 +46,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", &handler))
 }
 
+// -- Struct Declarations --
 type Task struct {
 	Name string
 	Args []string
@@ -56,8 +57,9 @@ type TaskResult struct {
 }
 
 type Tasks struct {
-	Channel *amqp.Channel
-	Config TaskConfig
+	Connection *amqp.Connection
+	Config *TaskConfig
+	ConfigFile string
 }
 
 type TaskConfig struct {
@@ -75,83 +77,84 @@ type MainConfig struct {
 	Port     string
 }
 
+// -- Tasks Function Bindings --
+
 // Retrieves the configuration from the config json
 // builds the TaskConfig object and returns it
-func getConfig(configFile string) *TaskConfig {
-	//setup defaults
-	configuration := MainConfig{}
+func (t *Tasks) GetConfig() *TaskConfig {
 
-	if _, err := os.Stat(configFile); os.IsNotExist(err) == false {
-		log.Printf("Config file found - loading configuration")
+	if (t.Config == nil) {
+		configuration := MainConfig{}
 
-		file, _ := os.Open(configFile)
-		decoder := json.NewDecoder(file)
-		err := decoder.Decode(&configuration)
-		if err != nil {
-			fmt.Println("Error decoding configuration:", err)
+		if _, err := os.Stat(t.ConfigFile); os.IsNotExist(err) == false {
+			log.Printf("Config file found - loading configuration")
+
+			file, _ := os.Open(t.ConfigFile)
+			decoder := json.NewDecoder(file)
+			err := decoder.Decode(&configuration)
+			if err != nil {
+				log.Printf("Error decoding configuration: %s\n", err)
+			}
+		} else {
+			//setup defaults
+			log.Printf("No config file found, using defaults.")
+			configuration.Cafile = "/vagrant/ssl/cacert.pem"
+			configuration.Keyfile = "/vagrant/ssl/key.pem"
+			configuration.Certfile = "/vagrant/ssl/cert.pem"
+			configuration.Username = "admin"
+			configuration.Password = "admin"
+			configuration.Host = "proxy"
+			configuration.Port = "5671"
 		}
-	} else {
-		log.Printf("No config file found, using defaults.")
-		configuration.Cafile = "/vagrant/ssl/cacert.pem"
-		configuration.Keyfile = "/vagrant/ssl/key.pem"
-		configuration.Certfile = "/vagrant/ssl/cert.pem"
-		configuration.Username = "admin"
-		configuration.Password = "admin"
-		configuration.Host = "proxy"
-		configuration.Port = "5671"
+
+		rootCa, err := ioutil.ReadFile(configuration.Cafile)
+		if err != nil { panic(err) }
+		clientKey, err := ioutil.ReadFile(configuration.Keyfile)
+		if err != nil { panic(err) }
+		clientCert, err := ioutil.ReadFile(configuration.Certfile)
+		if err != nil { panic(err) }
+
+		cfg := new(tls.Config)
+		cfg.RootCAs = x509.NewCertPool()
+		cfg.RootCAs.AppendCertsFromPEM([]byte(rootCa))
+		cfg.ServerName = "rabbit"
+
+		cert, _ := tls.X509KeyPair([]byte(clientCert), []byte(clientKey))
+		cfg.Certificates = append(cfg.Certificates, cert)
+
+		result := new(TaskConfig)
+		result.TlsConfig = cfg
+		result.Uri = fmt.Sprintf("amqps://%s:%s@%s:%s/", configuration.Username, configuration.Password, configuration.Host, configuration.Port)
+		t.Config = result
 	}
-
-	rootCa, err := ioutil.ReadFile(configuration.Cafile)
-	if err != nil { panic(err) }
-	clientKey, err := ioutil.ReadFile(configuration.Keyfile)
-	if err != nil { panic(err) }
-	clientCert, err := ioutil.ReadFile(configuration.Certfile)
-	if err != nil { panic(err) }
-
-	cfg := new(tls.Config)
-	cfg.RootCAs = x509.NewCertPool()
-	cfg.RootCAs.AppendCertsFromPEM([]byte(rootCa))
-	cfg.ServerName = "rabbit"
-
-	cert, _ := tls.X509KeyPair([]byte(clientCert), []byte(clientKey))
-	cfg.Certificates = append(cfg.Certificates, cert)
-
-	result := new(TaskConfig)
-	result.TlsConfig = cfg
-	result.Uri = fmt.Sprintf("amqps://%s:%s@%s:%s/", configuration.Username, configuration.Password, configuration.Host, configuration.Port)
-
-	return result
+	return t.Config
 }
 
 //  This function will return a amqp channel as well
 //  as setup the reconnect and retry logic in case
 //  the server its connected to becomes unavailable.
-func getAmqpChannel(config *TaskConfig) *amqp.Channel {
-
+func (t *Tasks) SetupAmqpConnection() *amqp.Connection {
+	config := t.GetConfig()
 	conn, err := amqp.DialTLS(config.Uri, config.TlsConfig)
-	var ch *amqp.Channel
 
 	//if err retry until connected.
 	if (err != nil) {
-		fmt.Printf("Error Connecting to amqp: %s\n", err)
+		log.Printf("Error Connecting to amqp: %s\n", err)
 		time.Sleep(1 * time.Second)
-		ch = getAmqpChannel(config)
+		conn = t.SetupAmqpConnection()
 	} else {
 		log.Printf("Connected to Rabbit")
-		ch, err = conn.Channel()
-		if (err != nil) {
-			panic(err)
-		}
 		//Setup Reconnect logic
 		go func() {
-			fmt.Printf("closing: %s \n", <-conn.NotifyClose(make(chan *amqp.Error)))
+			log.Printf("closing: %s \n", <-conn.NotifyClose(make(chan *amqp.Error)))
 			time.Sleep(1 * time.Second)
-			ch = getAmqpChannel(config)
+			conn = t.SetupAmqpConnection()
 		}()
 	}
 
+	t.Connection = conn
 	// return the channel
-	return ch
+	return conn
 }
 
 // POST http://go:8080/tasks
@@ -166,22 +169,33 @@ func (t *Tasks) PostTask(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log.Printf("postTask - '" + task.Name + "'")
+	log.Printf("postTask - '%s'", task.Name)
 
 	status := "success"
 
 	celeryTask, err := celery.NewTask(task.Name, task.Args, task.Kwargs)
 	if err != nil {
-		fmt.Printf("Could not create celery task: %+v \n", err)
+		log.Printf("Could not create celery task: %+v \n", err)
 		status = "failure"
 	}
 
-	err = celeryTask.Publish(t.Channel, "", "celery")
+	ch , err := t.Connection.Channel()
 	if err != nil {
-		fmt.Printf("Could not publish celery task: %+v \n", err)
+		log.Printf("Could not open channel: %+v \n", err)
 		status = "failure"
+	} else {
+		defer ch.Close()
+		err = celeryTask.Publish(ch, "", "celery")
+		if err != nil {
+			log.Printf("Could not publish celery task: %+v \n", err)
+			status = "failure"
+		}
 	}
 
-	result := TaskResult{status}
-	w.WriteJson(&result)
+	if status == "success" {
+		result := TaskResult{status}
+		w.WriteJson(&result)
+	} else {
+		rest.Error(w, "Failed to queue task.", 500)
+	}
 }
