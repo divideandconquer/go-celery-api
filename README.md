@@ -24,7 +24,7 @@ vagrant up
 
 ## RabbitMQ Cluster
 This repository requires the use of a rabbitmq / celery cluster.  To set one up follow the
-directions for the [rabbitmq-celery](https://github.com/turbine-web/rabbitmq-cluster) project.
+directions for the [rabbitmq-cluster](https://github.com/turbine-web/rabbitmq-cluster) project.
 
 Once you have the SSL keys generated make sure to copy the `testca/cacert.pem` and the the client `key.pem`
 and client `cert.pem` files into this repo.
