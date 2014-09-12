@@ -1,10 +1,10 @@
 DEPENDENCIES
-  go-sandbox
+  go-celery-api
     path: .
     metadata: true
   golang
 
 GRAPH
-  go-sandbox (1.0.0)
+  go-celery-api (1.0.0)
     golang (>= 0.0.0)
   golang (1.4.0)
