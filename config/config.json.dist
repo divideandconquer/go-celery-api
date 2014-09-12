@@ -5,5 +5,6 @@
   "Username" : "admin",
   "Password" : "admin",
   "Host" : "proxy",
-  "Port" : "5671"
+  "Port" : "5671",
+  "CN" : "rabbit"
 }

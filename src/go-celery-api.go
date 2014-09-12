@@ -24,7 +24,7 @@ func main() {
   flag.Parse()
 
   if *configFile != "" {
-	log.Printf("configFile: " + *configFile)
+  log.Printf("configFile: " + *configFile)
   }
 
   //setup tasks
@@ -35,21 +35,21 @@ func main() {
 
   //setup resource handler and routes
   handler := rest.ResourceHandler{
-	EnableRelaxedContentType: true,
+  EnableRelaxedContentType: true,
   }
   err := handler.SetRoutes(
   rest.RouteObjectMethod("POST", "/tasks", tasks, "PostTask"),
   )
   if err != nil {
-	log.Fatal(err)
+  log.Fatal(err)
   }
   log.Fatal(http.ListenAndServe(":8080", &handler))
 }
 
 // -- Struct Declarations --
 type Task struct {
-  Name string
-  Args []string
+  Name   string
+  Args   []string
   Kwargs map[string]interface{}
 }
 type TaskResult struct {
@@ -58,12 +58,12 @@ type TaskResult struct {
 
 type Tasks struct {
   Connection *amqp.Connection
-  Config *TaskConfig
+  Config     *TaskConfig
   ConfigFile string
 }
 
 type TaskConfig struct {
-  Uri string
+  Uri       string
   TlsConfig *tls.Config
 }
 
@@ -75,6 +75,7 @@ type MainConfig struct {
   Password string
   Host     string
   Port     string
+  CN       string
 }
 
 // -- Tasks Function Bindings --
@@ -84,48 +85,49 @@ type MainConfig struct {
 func (t *Tasks) GetConfig() *TaskConfig {
 
   if (t.Config == nil) {
-	configuration := MainConfig{}
+    configuration := MainConfig{}
 
-	if _, err := os.Stat(t.ConfigFile); os.IsNotExist(err) == false {
-	  log.Printf("Config file found - loading configuration")
+    if _, err := os.Stat(t.ConfigFile); os.IsNotExist(err) == false {
+      log.Printf("Config file found - loading configuration")
 
-	  file, _ := os.Open(t.ConfigFile)
-	  decoder := json.NewDecoder(file)
-	  err := decoder.Decode(&configuration)
-	  if err != nil {
-		log.Printf("Error decoding configuration: %s\n", err)
-	  }
-	} else {
-	  //setup defaults
-	  log.Printf("No config file found, using defaults.")
-	  configuration.Cafile = "/vagrant/ssl/cacert.pem"
-	  configuration.Keyfile = "/vagrant/ssl/key.pem"
-	  configuration.Certfile = "/vagrant/ssl/cert.pem"
-	  configuration.Username = "admin"
-	  configuration.Password = "admin"
-	  configuration.Host = "proxy"
-	  configuration.Port = "5671"
-	}
+      file, _ := os.Open(t.ConfigFile)
+      decoder := json.NewDecoder(file)
+      err := decoder.Decode(&configuration)
+      if err != nil {
+      log.Printf("Error decoding configuration: %s\n", err)
+      }
+    } else {
+      //setup defaults
+      log.Printf("No config file found, using defaults.")
+      configuration.Cafile = "/vagrant/ssl/cacert.pem"
+      configuration.Keyfile = "/vagrant/ssl/key.pem"
+      configuration.Certfile = "/vagrant/ssl/cert.pem"
+      configuration.Username = "admin"
+      configuration.Password = "admin"
+      configuration.Host = "proxy"
+      configuration.Port = "5671"
+      configuration.CN = "rabbit"
+    }
 
-	rootCa, err := ioutil.ReadFile(configuration.Cafile)
-	if err != nil { panic(err) }
-	clientKey, err := ioutil.ReadFile(configuration.Keyfile)
-	if err != nil { panic(err) }
-	clientCert, err := ioutil.ReadFile(configuration.Certfile)
-	if err != nil { panic(err) }
+    rootCa, err := ioutil.ReadFile(configuration.Cafile)
+    if err != nil { panic(err) }
+    clientKey, err := ioutil.ReadFile(configuration.Keyfile)
+    if err != nil { panic(err) }
+    clientCert, err := ioutil.ReadFile(configuration.Certfile)
+    if err != nil { panic(err) }
 
-	cfg := new(tls.Config)
-	cfg.RootCAs = x509.NewCertPool()
-	cfg.RootCAs.AppendCertsFromPEM([]byte(rootCa))
-	cfg.ServerName = "rabbit"
+    cfg := new(tls.Config)
+    cfg.RootCAs = x509.NewCertPool()
+    cfg.RootCAs.AppendCertsFromPEM([]byte(rootCa))
+    cfg.ServerName = configuration.CN
 
-	cert, _ := tls.X509KeyPair([]byte(clientCert), []byte(clientKey))
-	cfg.Certificates = append(cfg.Certificates, cert)
+    cert, _ := tls.X509KeyPair([]byte(clientCert), []byte(clientKey))
+    cfg.Certificates = append(cfg.Certificates, cert)
 
-	result := new(TaskConfig)
-	result.TlsConfig = cfg
-	result.Uri = fmt.Sprintf("amqps://%s:%s@%s:%s/", configuration.Username, configuration.Password, configuration.Host, configuration.Port)
-	t.Config = result
+    result := new(TaskConfig)
+    result.TlsConfig = cfg
+    result.Uri = fmt.Sprintf("amqps://%s:%s@%s:%s/", configuration.Username, configuration.Password, configuration.Host, configuration.Port)
+    t.Config = result
   }
   return t.Config
 }
@@ -139,21 +141,21 @@ func (t *Tasks) SetupAmqpConnection() *amqp.Connection {
 
   //if err retry until connected.
   if (err != nil) {
-	log.Printf("Error Connecting to amqp: %s\n", err)
-	time.Sleep(1 * time.Second)
-	conn = t.SetupAmqpConnection()
+    log.Printf("Error Connecting to amqp: %s\n", err)
+    time.Sleep(1 * time.Second)
+    conn = t.SetupAmqpConnection()
   } else {
-	log.Printf("Connected to Rabbit")
-	//Setup Reconnect logic
-	go func() {
-	  log.Printf("closing: %s \n", <-conn.NotifyClose(make(chan *amqp.Error)))
-	  time.Sleep(1 * time.Second)
-	  conn = t.SetupAmqpConnection()
-	}()
+    log.Printf("Connected to Rabbit")
+    //Setup Reconnect logic
+    go func() {
+      log.Printf("closing: %s \n", <-conn.NotifyClose(make(chan *amqp.Error)))
+      time.Sleep(1 * time.Second)
+      conn = t.SetupAmqpConnection()
+    }()
   }
 
   t.Connection = conn
-  // return the channel
+  // return the connection
   return conn
 }
 
@@ -165,37 +167,34 @@ func (t *Tasks) PostTask(w rest.ResponseWriter, r *rest.Request) {
   task := Task{}
   err := r.DecodeJsonPayload(&task)
   if err != nil {
-	log.Printf("postTask - error reading payload.")
-	rest.Error(w, err.Error(), http.StatusInternalServerError)
-	return
-  }
-  log.Printf("postTask - '%s'", task.Name)
-
-  status := "success"
-
-  celeryTask, err := celery.NewTask(task.Name, task.Args, task.Kwargs)
-  if err != nil {
-	log.Printf("Could not create celery task: %+v \n", err)
-	status = "failure"
-  }
-
-  ch , err := t.Connection.Channel()
-  if err != nil {
-	log.Printf("Could not open channel: %+v \n", err)
-	status = "failure"
+    log.Printf("postTask - error reading payload.")
+    rest.Error(w, err.Error(), http.StatusInternalServerError)
   } else {
-	defer ch.Close()
-	err = celeryTask.Publish(ch, "", "celery")
-	if err != nil {
-	  log.Printf("Could not publish celery task: %+v \n", err)
-	  status = "failure"
-	}
-  }
-
-  if status == "success" {
-	result := TaskResult{status}
-	w.WriteJson(&result)
-  } else {
-	rest.Error(w, "Failed to queue task.", 500)
+    log.Printf("postTask - '%s'", task.Name)
+    // we have a payload, create the celery task
+    celeryTask, err := celery.NewTask(task.Name, task.Args, task.Kwargs)
+    if err != nil {
+      log.Printf("Could not create celery task: %+v \n", err)
+      rest.Error(w, "Failed to create the celery task requested.", http.StatusBadRequest)
+    } else {
+        //we have created a task, now open a channel
+      ch , err := t.Connection.Channel()
+      if err != nil {
+        log.Printf("Could not open channel: %+v \n", err)
+        rest.Error(w, "Error connecting to celery", http.StatusInternalServerError)
+      } else {
+        //we have a channel so publish the task
+        defer ch.Close()
+        err = celeryTask.Publish(ch, "", "celery")
+        if err != nil {
+          log.Printf("Could not publish celery task: %+v \n", err)
+          rest.Error(w, "Error publishing task to celery", http.StatusInternalServerError)
+        } else {
+          // Success!
+          result := TaskResult{"success"}
+          w.WriteJson(&result)
+        }
+      }
+    }
   }
 }

@@ -59,6 +59,8 @@ The available configuration options are as follows:
   * The rabbitmq dns name / ip address (likely this is the load balancer's host name)
 * Port
   * The rabbitmq port (5672 or 5671 for ssl)
+* CN
+  * The common name on the SSL certs
 
 
 ## Running the API
