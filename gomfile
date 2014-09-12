@@ -1,0 +1,3 @@
+gom 'github.com/streadway/amqp', :commit => 'affa76d059881a8849a73d78ef5629004b9bf1f7'
+gom 'github.com/bsphere/celery', :commit => 'eac25ed6f365b79e59065d3631acb17226465e43'
+gom 'github.com/ant0ine/go-json-rest', :commit => 'f253ff849ea92000d2e2a9d8cf5f2138f4172213'
