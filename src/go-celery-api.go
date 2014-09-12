@@ -24,7 +24,7 @@ func main() {
   flag.Parse()
 
   if *configFile != "" {
-  log.Printf("configFile: " + *configFile)
+    log.Printf("configFile: " + *configFile)
   }
 
   //setup tasks
@@ -35,13 +35,13 @@ func main() {
 
   //setup resource handler and routes
   handler := rest.ResourceHandler{
-  EnableRelaxedContentType: true,
+    EnableRelaxedContentType: true,
   }
   err := handler.SetRoutes(
-  rest.RouteObjectMethod("POST", "/tasks", tasks, "PostTask"),
+    rest.RouteObjectMethod("POST", "/tasks", tasks, "PostTask"),
   )
   if err != nil {
-  log.Fatal(err)
+    log.Fatal(err)
   }
   log.Fatal(http.ListenAndServe(":8080", &handler))
 }
